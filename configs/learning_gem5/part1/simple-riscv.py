@@ -30,7 +30,14 @@ X86 ISA). More detailed documentation can be found in `simple.py`.
 """
 
 import m5
+
 from m5.objects import *
+
+# import the caches which we made
+from caches import *
+
+# Finalize the arguments and grab the args so we can pass it on to our objects
+args = SimpleOpts.parse_args()
 
 system = System()
 
@@ -42,10 +49,34 @@ system.mem_mode = "timing"
 system.mem_ranges = [AddrRange("512MB")]
 system.cpu = RiscvTimingSimpleCPU()
 
+# Create an L1 instruction and data cache
+system.cpu.icache = L1ICache(args)
+system.cpu.dcache = L1DCache(args)
+
+# Connect the instruction and data caches to the CPU
+system.cpu.icache.connectCPU(system.cpu)
+system.cpu.dcache.connectCPU(system.cpu)
+
+# Create a memory bus, a coherent crossbar, in this case
+system.l2bus = L2XBar()
+
+# Hook the CPU ports up to the l2bus
+system.cpu.icache.connectBus(system.l2bus)
+system.cpu.dcache.connectBus(system.l2bus)
+
+# Create an L2 cache and connect it to the l2bus
+system.l2cache = L2Cache(args)
+system.l2cache.connectCPUSideBus(system.l2bus)
+
+# Create a memory bus
 system.membus = SystemXBar()
 
-system.cpu.icache_port = system.membus.cpu_side_ports
-system.cpu.dcache_port = system.membus.cpu_side_ports
+# Connect the L2 cache to the membus
+system.l2cache.connectMemSideBus(system.membus)
+
+#system.membus = SystemXBar()
+#system.cpu.icache_port = system.membus.cpu_side_ports
+#system.cpu.dcache_port = system.membus.cpu_side_ports
 
 system.cpu.createInterruptController()
 
